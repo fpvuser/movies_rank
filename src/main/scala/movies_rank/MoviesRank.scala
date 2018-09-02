@@ -6,7 +6,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._ 
 import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, UserDefinedFunction}
 import com.google.gson.Gson
 import scala.collection.JavaConversions._
 import scala.math.sqrt
@@ -32,19 +32,27 @@ object MoviesRank extends SparkSessionWrapper{
 		val voteCountFactor = udf[Double, Double](x => x / (x + 29))
 		val moviesCountFactor = udf[Double, Double](x => x / (x + 1))
 
-		val companiesScore = moviesDf
-		.withColumn("voteAvgSeeingCount", $"vote_average" * voteCountFactor($"vote_count"))
+		val companiesScore = calculateCompaniesScoreDf(moviesDf, 
+													   voteCountFactor, 
+													   moviesCountFactor)
+
+		val companiesScoreArray = companiesScore.collect()
+		for(m <- companiesScoreArray) yield println(m(0) + "\t" + m(1))
+
+		spark.stop()
+	}
+
+	def calculateCompaniesScoreDf(moviesDf: DataFrame, 
+								  voteCountFactor: UserDefinedFunction,
+								  moviesCountFactor: UserDefinedFunction): DataFrame = {
+		moviesDf
+			.withColumn("voteAvgSeeingCount", $"vote_average" * voteCountFactor($"vote_count"))
 			.groupBy("companies")
 			.agg(avg("voteAvgSeeingCount").as("processed_vote_average"),
 			 	 max("movies_count").as("movies_count"))
 			.withColumn("score", $"processed_vote_average" * moviesCountFactor($"movies_count"))
 			.select("companies", "score")
 			.orderBy(desc("score"))
-
-		val companiesScoreArray = companiesScore.collect()
-		for(m <- companiesScoreArray) yield println(m(0) + "\t" + m(1))
-
-		spark.stop()
 	}
 
 		// Assign types to columns and extract names from "production_companies" column.
