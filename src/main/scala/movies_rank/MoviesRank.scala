@@ -49,6 +49,29 @@ object MoviesRank {
 
 	val avgVoteCount: Double = movies_df.agg(avg(col("vote_count"))).collect().head(0).asInstanceOf[Double]
 
+      /* Using a sigmoid to underestimate the evaluation of companies 
+         with a small number of votes or a small number of movies.
+           alpha - sigmoid parameter. Bigger alpha - flatter sigmoid.
+         Examples:
+           sigmoid(1)(5) = 0.8333...
+           sigmoid(1)(10) = 0.909...
+           sigmoid(1)(50) = 0.9803...
+           sigmoid(29)(5) = 0.147...
+           sigmoid(29)(10) = 0.256...
+           sigmoid(29)(50) = 0.632... */
+    def sigmoid(alpha: Double)(x: Double): Double = x/(x+alpha)
+    val voteCountFactor = udf[Double, Double](sigmoid(sqrt(avgVoteCount)))
+    val moviesCountFactor = udf[Double, Double](sigmoid(1))
+
+    val companies_score = movies_df
+	    .withColumn("voteAvgSeeingCount", col("vote_average")*voteCountFactor(col("vote_count")))
+	    .groupBy("companies")
+	    .agg(avg("voteAvgSeeingCount").as("processed_vote_average"), 
+	         max("movies_count").as("movies_count"))
+	    .withColumn("score", col("processed_vote_average")*moviesCountFactor(col("movies_count")))
+	    .select("companies", "score")
+	    .orderBy(desc("score")).cache()
+
     spark.stop()
   }
 }
