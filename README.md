@@ -1,6 +1,6 @@
 # movies_rank
 
-##Run project:
+## Run project
 
 In top project directory:
 
