@@ -19,8 +19,6 @@ object MoviesRank extends SparkSessionWrapper{
 		val moviesDf = processMoviesDf(moviesRawDf)
 
 		  /* x/(x+alpha) is sigmoid function.
-		  	 Using a sigmoid to underestimate the evaluation of companies 
-		     with a small number of votes or a small number of movies.
 		       alpha - sigmoid parameter. Bigger alpha - flatter sigmoid.
 		     Examples:
 		       sigmoid(alpha = 1, x = 5) = 0.8333...
@@ -41,7 +39,11 @@ object MoviesRank extends SparkSessionWrapper{
 
 		spark.stop()
 	}
+		/*  Using a sigmoid to underestimate the evaluation of companies 
+		    with a small number of votes or a small number of movies.
 
+		    voteAvgSeeingCount = vote_average * sigmoid(alpha=29, x=vote_count)
+		    score = avg(voteAvgSeeingCount) * sigmoid(alpha=1, x=movies_count) */
 	def calculateCompaniesScoreDf(moviesDf: DataFrame, 
 								  voteCountFactor: UserDefinedFunction,
 								  moviesCountFactor: UserDefinedFunction): DataFrame = {
@@ -58,6 +60,7 @@ object MoviesRank extends SparkSessionWrapper{
 		// Assign types to columns and extract names from "production_companies" column.
 	def processMoviesDf(rawDf: DataFrame)(implicit spark: SparkSession): DataFrame = {
 
+			// json schema in production_companies column.
 		val productionCompaniesSchema = ArrayType(
 			StructType(Seq(
 				$"name".string,
