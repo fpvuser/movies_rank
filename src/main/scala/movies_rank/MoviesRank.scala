@@ -24,24 +24,24 @@ object MoviesRank {
 			Example:
 		  jsonToList("key1")([{"key1": "first1", "key2": "second1"}, {"key1": "first2", "key2": "second2"}]) =
 			List("first1", "first2") */
-		def jsonToList(key: String)(inputString: String): List[String] = {
-		  val map = new Gson().fromJson(inputString, classOf[java.util.List[java.util.Map[String, String]]])
-		  return map.toList.map(x => x(key).trim)
-		}
+		val productionCompaniesSchema = ArrayType(
+		    StructType(Seq(
+		      $"name".string,
+		      $"id".int)))
 
-		  // This UDF takes only names from json.
-		val jsonToListOfNamesUDF = udf[List[String], String](jsonToList("name"))
+		// This UDF takes only names from json.
+		val companyCol = explode(from_json($"production_companies", productionCompaniesSchema)) //("name").as("companies")
 
-		val movies_df_raw = readRawMoviesDf("data/tmdb_5000_movies.csv")
+		val moviesRawDf = readRawMoviesDf("data/tmdb_5000_movies.csv")
 
-		  // Assign types to columns and extract names from "production_companies" column.
-		val movies_df = movies_df_raw.where(col("id").isNotNull)
-		    .select(col("id").cast(IntegerType), 
-		            explode(jsonToListOfNamesUDF(col("production_companies"))).as("companies"), 
-		            col("vote_average").cast(FloatType), 
-		            col("vote_count").cast(IntegerType))
-		    .withColumn("movies_count", count("id") over Window.partitionBy("companies"))
-		    .cache()
+		// Assign types to columns and extract names from "production_companies" column.
+		val moviesDf = moviesRawDf.where($"id".isNotNull)
+			.withColumn("company", companyCol)
+			.select($"id".cast(IntegerType),
+			$"company.name".as("companies"),
+			$"vote_average".cast(FloatType),
+			$"vote_count".cast(IntegerType))
+			.withColumn("movies_count", count("id") over Window.partitionBy("companies")).cache()
 
 		  /* x/(x+alpha) is sigmoid function.
 		  	 Using a sigmoid to underestimate the evaluation of companies 
@@ -57,17 +57,17 @@ object MoviesRank {
 		val voteCountFactor = udf[Double, Double](x => x / (x + 29))
 		val moviesCountFactor = udf[Double, Double](x => x / (x + 1))
 
-		val companies_score = movies_df
-		    .withColumn("voteAvgSeeingCount", col("vote_average")*voteCountFactor(col("vote_count")))
-		    .groupBy("companies")
-		    .agg(avg("voteAvgSeeingCount").as("processed_vote_average"), 
-		         max("movies_count").as("movies_count"))
-		    .withColumn("score", col("processed_vote_average")*moviesCountFactor(col("movies_count")))
-		    .select("companies", "score")
-		    .orderBy(desc("score")).cache()
+		val companiesScore = moviesDf
+		.withColumn("voteAvgSeeingCount", $"vote_average" * voteCountFactor($"vote_count"))
+			.groupBy("companies")
+			.agg(avg("voteAvgSeeingCount").as("processed_vote_average"),
+			 	 max("movies_count").as("movies_count"))
+			.withColumn("score", $"processed_vote_average" * moviesCountFactor($"movies_count"))
+			.select("companies", "score")
+			.orderBy(desc("score"))
 
-		val companies_score_array = companies_score.collect()
-		for(m <- companies_score_array) yield println(m(0) + "\t" + m(1))
+		val companiesScoreArray = companiesScore.collect()
+		for(m <- companiesScoreArray) yield println(m(0) + "\t" + m(1))
 
 		spark.stop()
 	}
