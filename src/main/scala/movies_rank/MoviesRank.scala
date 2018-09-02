@@ -20,12 +20,24 @@ object MoviesRank {
       return map.toList.map(x => x(key).trim)
     }
 
+      // This UDF takes only names from json.
+    val jsonToListOfNamesUDF = udf[List[String], String](jsonToList("name"))
+
     val movies_df_raw = spark.read.format("csv")
 	    .option("header", "true")
 	    .option("multiLine", true)
 	    .option("quote", "\"")
 	    .option("escape", "\"")
 	    .load("data/tmdb_5000_movies.csv")
+	    .cache()
+
+      // Assign types to columns and extract names from "production_companies" column.
+    val movies_df = movies_df_raw.where(col("id").isNotNull)
+	    .select(col("id").cast(IntegerType), 
+	            explode(jsonToListOfNamesUDF(col("production_companies"))).as("companies"), 
+	            col("vote_average").cast(FloatType), 
+	            col("vote_count").cast(IntegerType))
+	    .withColumn("movies_count", count("id") over Window.partitionBy("companies"))
 	    .cache()
 
     spark.stop()
