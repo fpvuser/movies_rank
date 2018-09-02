@@ -11,6 +11,14 @@ object MoviesRank {
       .appName("Movies rank")
       .getOrCreate()
 
+    val movies_df_raw = spark.read.format("csv")
+	    .option("header", "true")
+	    .option("multiLine", true)
+	    .option("quote", "\"")
+	    .option("escape", "\"")
+	    .load("data/tmdb_5000_movies.csv")
+	    .cache()
+
     spark.stop()
   }
 }
