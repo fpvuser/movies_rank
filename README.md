@@ -2,7 +2,10 @@
 
 ## Run project
 
-In top project directory:
+
+Create directory "movies_rank/data/" and save file tmdb_5000_movies.csv there. (get file here: https://www.kaggle.com/tmdb/tmdb-movie-metadata)
+
+then in top project directory run:
 
 `sbt compile package`
 
