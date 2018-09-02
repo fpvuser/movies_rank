@@ -72,6 +72,9 @@ object MoviesRank {
 	    .select("companies", "score")
 	    .orderBy(desc("score")).cache()
 
+    val companies_score_array = companies_score.collect()
+    for(m <- companies_score_array) yield println(m(0) + "\t" + m(1))
+
     spark.stop()
   }
 }
