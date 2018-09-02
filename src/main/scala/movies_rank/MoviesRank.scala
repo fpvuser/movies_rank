@@ -58,7 +58,7 @@ object MoviesRank extends SparkSessionWrapper{
 	}
 
 		// Assign types to columns and extract names from "production_companies" column.
-	def processMoviesDf(rawDf: DataFrame)(implicit spark: SparkSession): DataFrame = {
+	def processMoviesDf(rawDf: DataFrame): DataFrame = {
 
 			// json schema in production_companies column.
 		val productionCompaniesSchema = ArrayType(
