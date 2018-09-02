@@ -40,6 +40,8 @@ object MoviesRank {
 	    .withColumn("movies_count", count("id") over Window.partitionBy("companies"))
 	    .cache()
 
+	val avgVoteCount: Double = movies_df.agg(avg(col("vote_count"))).collect().head(0).asInstanceOf[Double]
+
     spark.stop()
   }
 }
