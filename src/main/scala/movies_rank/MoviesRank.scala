@@ -3,6 +3,13 @@ package movies_rank
 import scala.math.random
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._ 
+import org.apache.spark.sql.functions.udf
+import org.apache.spark.sql.expressions.Window
+import com.google.gson.Gson
+import scala.collection.JavaConversions._
+import scala.math.sqrt
 
 object MoviesRank {
   def main(args: Array[String]) {
