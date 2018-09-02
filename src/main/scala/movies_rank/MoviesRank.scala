@@ -31,8 +31,8 @@ object MoviesRank extends SparkSessionWrapper{
 		val moviesCountFactor = udf[Double, Double](x => x / (x + 1))
 
 		val companiesScore = calculateCompaniesScoreDf(moviesDf, 
-													   voteCountFactor, 
-													   moviesCountFactor)
+			voteCountFactor, 
+			moviesCountFactor)
 
 		val companiesScoreArray = companiesScore.collect()
 		for(m <- companiesScoreArray) yield println(m(0) + "\t" + m(1))
@@ -45,8 +45,8 @@ object MoviesRank extends SparkSessionWrapper{
 		    voteAvgSeeingCount = vote_average * sigmoid(alpha=29, x=vote_count)
 		    score = avg(voteAvgSeeingCount) * sigmoid(alpha=1, x=movies_count) */
 	def calculateCompaniesScoreDf(moviesDf: DataFrame, 
-								  voteCountFactor: UserDefinedFunction,
-								  moviesCountFactor: UserDefinedFunction): DataFrame = {
+			voteCountFactor: UserDefinedFunction,
+			moviesCountFactor: UserDefinedFunction): DataFrame = {
 		moviesDf
 			.withColumn("voteAvgSeeingCount", $"vote_average" * voteCountFactor($"vote_count"))
 			.groupBy("companies")
