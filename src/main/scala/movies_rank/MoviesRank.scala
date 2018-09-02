@@ -11,37 +11,12 @@ import com.google.gson.Gson
 import scala.collection.JavaConversions._
 import scala.math.sqrt
 
-object MoviesRank {
+object MoviesRank extends SparkSessionWrapper{
+	import spark.implicits._
+
 	def main(args: Array[String]) {
-		implicit val spark = SparkSession
-		  .builder
-		  .appName("Movies rank")
-		  .getOrCreate()
-
-		import spark.implicits._
-
-		/* Parse json(with type: Array[Map[String -> String]]) to List of some key's values.
-			Example:
-		  jsonToList("key1")([{"key1": "first1", "key2": "second1"}, {"key1": "first2", "key2": "second2"}]) =
-			List("first1", "first2") */
-		val productionCompaniesSchema = ArrayType(
-		    StructType(Seq(
-		      $"name".string,
-		      $"id".int)))
-
-		// This UDF takes only names from json.
-		val companyCol = explode(from_json($"production_companies", productionCompaniesSchema)) //("name").as("companies")
-
 		val moviesRawDf = readRawMoviesDf("data/tmdb_5000_movies.csv")
-
-		// Assign types to columns and extract names from "production_companies" column.
-		val moviesDf = moviesRawDf.where($"id".isNotNull)
-			.withColumn("company", companyCol)
-			.select($"id".cast(IntegerType),
-			$"company.name".as("companies"),
-			$"vote_average".cast(FloatType),
-			$"vote_count".cast(IntegerType))
-			.withColumn("movies_count", count("id") over Window.partitionBy("companies")).cache()
+		val moviesDf = processMoviesDf(moviesRawDf)
 
 		  /* x/(x+alpha) is sigmoid function.
 		  	 Using a sigmoid to underestimate the evaluation of companies 
@@ -72,14 +47,34 @@ object MoviesRank {
 		spark.stop()
 	}
 
+		// Assign types to columns and extract names from "production_companies" column.
+	def processMoviesDf(rawDf: DataFrame)(implicit spark: SparkSession): DataFrame = {
+
+		val productionCompaniesSchema = ArrayType(
+			StructType(Seq(
+				$"name".string,
+				$"id".int)))
+			// Parse json to Array of Maps and explode it.
+		val companyCol = explode(from_json($"production_companies", productionCompaniesSchema))
+
+		rawDf.where($"id".isNotNull)
+			.withColumn("company", companyCol)
+			.select($"id".cast(IntegerType),
+					$"company.name".as("companies"),
+					$"vote_average".cast(FloatType),
+					$"vote_count".cast(IntegerType))
+			.withColumn("movies_count", count("id") over Window.partitionBy("companies"))
+			.cache()
+	}
+
   	def readRawMoviesDf(inputFile: String)(implicit spark: SparkSession): DataFrame = {
 		spark.read.format("csv")
-		.option("header", "true")
-		.option("multiLine", true)
-		.option("quote", "\"")
-		.option("escape", "\"")
-		.option("inferSchema", "true").load(inputFile)
-		.cache()
+			.option("header", "true")
+			.option("multiLine", true)
+			.option("quote", "\"")
+			.option("escape", "\"")
+			.option("inferSchema", "true").load(inputFile)
+			.cache()
 	}
 
   //def readFromCSV(fileName: String): DataFrame
